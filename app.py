@@ -153,4 +153,5 @@ with left:
 
 with right:
     st.subheader("📋 All Live Players")
-    st.dataframe(df[["name", "team", "matchup", "FGA", "3PTA", "TO", "PTS"]], use_container_width=True, hide_index=True)
+    cols = ["name","team","matchup","MIN","PTS","FGM","FGA","3PM","3PA","FTM","FTA","REB","AST","STL","BLK","TO","PF"]
+st.dataframe(df[cols], use_container_width=True, hide_index=True)
