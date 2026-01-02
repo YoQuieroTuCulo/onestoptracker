@@ -72,10 +72,17 @@ if not games:
     st.stop()
 
 all_rows = []
+skipped = 0
+
 for g in games:
     gid = g["gameId"]
+
     home, away = get_boxscore(gid)
-    players = home["players"] + away["players"]
+    if home is None or away is None:
+        skipped += 1
+        continue
+
+    players = home.get("players", []) + away.get("players", [])
     rows = normalize_player_stats(players)
 
     matchup = f'{away["teamTricode"]} @ {home["teamTricode"]}'
@@ -83,6 +90,10 @@ for g in games:
         r["matchup"] = matchup
         r["gameId"] = gid
         all_rows.append(r)
+
+if skipped > 0:
+    st.sidebar.info(f"Skipped {skipped} game(s) with unavailable boxscore (not started or temporarily blocked).")
+
 
 df = pd.DataFrame(all_rows)
 if df.empty:
