@@ -64,43 +64,47 @@ st.caption("Box Score is free. Advanced tab is a separate (lockable) feature.")
 
 
 # -----------------------
-# Pull games + build one big DF
+# Pull games + build one big DF (ESPN backend)
 # -----------------------
 games = get_live_games()
 if not games:
-    st.warning("No live games found right now (or NBA feed temporarily unavailable).")
+    st.warning("No games found for today (or feed temporarily unavailable).")
     st.stop()
 
-
-    all_rows = []
+all_rows = []
 skipped = 0
 
 for g in games:
-    gid = g["gameId"]
-    date = g["date"]
+    gid = g.get("gameId")
+    if not gid:
+        skipped += 1
+        continue
 
-   summary = get_boxscore(gid)
-if not summary:
-    skipped += 1
-    continue
+    summary = get_boxscore(gid)
+    if not summary:
+        skipped += 1
+        continue
 
-rows = normalize_player_stats(summary)
-matchup = f'{g.get("awayTricode","")} @ {g.get("homeTricode","")}'
-for r in rows:
-    r["matchup"] = matchup
-    r["gameId"] = gid
-    all_rows.append(r)
+    rows = normalize_player_stats(summary)
 
+    matchup = f'{g.get("awayTricode","")} @ {g.get("homeTricode","")}'
+    for r in rows:
+        r["matchup"] = matchup
+        r["gameId"] = gid
+        all_rows.append(r)
 
 if skipped:
-    st.sidebar.info(f"Skipped {skipped} game(s) (boxscore not available yet).")
+    st.sidebar.info(f"Skipped {skipped} game(s) (boxscore unavailable yet).")
 
 df = pd.DataFrame(all_rows)
 if df.empty:
-    st.warning("No player stats available yet.")
+    st.warning("No player stats available yet (games may not have started).")
     st.stop()
 
 # Clean + sort
+for c in ["PTS", "FGA", "3PA", "TO"]:
+    if c not in df.columns:
+        df[c] = 0
 df = df.sort_values(["PTS", "FGA", "3PA", "TO"], ascending=[False, False, False, False]).reset_index(drop=True)
 
 
@@ -113,19 +117,24 @@ if "watchlist" not in st.session_state:
 player_options = df["name"].dropna().unique().tolist()
 
 # Box-score stats user can watch (safe for free tab)
-watch_stats = ["PTS","FGA","3PA","TO","AST","REB","STL","BLK","MIN","FTA","PF"]
+watch_stats = ["PTS", "FGA", "3PA", "TO", "AST", "REB", "STL", "BLK", "MIN", "FTA", "PF"]
 
 with st.sidebar:
-    sel_player = st.selectbox("Player", options=player_options)
+    if player_options:
+        sel_player = st.selectbox("Player", options=player_options)
+    else:
+        sel_player = st.text_input("Player (no data yet)")
+
     sel_stat = st.selectbox("Stat", options=watch_stats)
     sel_target = st.number_input("Target (optional)", min_value=0.0, value=0.0, step=0.5)
 
     if st.button("Add to watchlist"):
-        st.session_state["watchlist"].append({
-            "player": sel_player,
-            "stat": sel_stat,
-            "target": sel_target if sel_target > 0 else None
-        })
+        if sel_player:
+            st.session_state["watchlist"].append({
+                "player": sel_player,
+                "stat": sel_stat,
+                "target": sel_target if sel_target > 0 else None
+            })
 
     if st.button("Clear watchlist"):
         st.session_state["watchlist"] = []
@@ -176,10 +185,12 @@ with tab_box:
     with right:
         st.subheader("📋 All Live Players (Box Score)")
         cols_box = [
-            "name","team","matchup","MIN","PTS",
-            "FGM","FGA","3PM","3PA","FTM","FTA",
-            "REB","AST","STL","BLK","TO","PF"
+            "name", "team", "matchup", "MIN", "PTS",
+            "FGM", "FGA", "3PM", "3PA", "FTM", "FTA",
+            "REB", "AST", "STL", "BLK", "TO", "PF"
         ]
+        # Only show columns that exist (ESPN can vary slightly)
+        cols_box = [c for c in cols_box if c in df.columns]
         st.dataframe(df[cols_box], use_container_width=True, hide_index=True)
 
 with tab_adv:
@@ -192,10 +203,11 @@ with tab_adv:
     adv = add_advanced_columns(df)
 
     cols_adv = [
-        "name","team","matchup","MIN",
-        "PRA","PR","PA","RA","STOCKS",
-        "USG_PROXY","PTS_PER_USG",
-        "FG%","3P%","FT%",
-        "PTS","REB","AST","STL","BLK","TO","FGA","3PA","FTA"
+        "name", "team", "matchup", "MIN",
+        "PRA", "PR", "PA", "RA", "STOCKS",
+        "USG_PROXY", "PTS_PER_USG",
+        "FG%", "3P%", "FT%",
+        "PTS", "REB", "AST", "STL", "BLK", "TO", "FGA", "3PA", "FTA"
     ]
+    cols_adv = [c for c in cols_adv if c in adv.columns]
     st.dataframe(adv[cols_adv], use_container_width=True, hide_index=True)
