@@ -79,19 +79,18 @@ for g in games:
     gid = g["gameId"]
     date = g["date"]
 
-    home, away = get_boxscore(gid, date)
-    if home is None:
-        skipped += 1
-        continue
+   summary = get_boxscore(gid)
+if not summary:
+    skipped += 1
+    continue
 
-    players = home.get("players", [])  # players list is here
-    rows = normalize_player_stats(players)
+rows = normalize_player_stats(summary)
+matchup = f'{g.get("awayTricode","")} @ {g.get("homeTricode","")}'
+for r in rows:
+    r["matchup"] = matchup
+    r["gameId"] = gid
+    all_rows.append(r)
 
-    matchup = f'{g.get("awayTricode","")} @ {g.get("homeTricode","")}'
-    for r in rows:
-        r["matchup"] = matchup
-        r["gameId"] = gid
-        all_rows.append(r)
 
 if skipped:
     st.sidebar.info(f"Skipped {skipped} game(s) (boxscore not available yet).")
