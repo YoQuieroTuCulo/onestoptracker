@@ -3,6 +3,7 @@ import time
 import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+from logic.advanced import add_advanced_columns
 
 from data.fetch_live import get_live_games, get_boxscore
 from data.normalize import normalize_player_stats
@@ -32,6 +33,12 @@ def check_password() -> bool:
 if not check_password():
     st.stop()
 
+def advanced_unlocked() -> bool:
+    """
+    Beta feature flag for advanced tab.
+    Later: replace with Stripe subscription check.
+    """
+    return str(st.secrets.get("ADVANCED_UNLOCKED", "false")).lower() == "true"
 
 # -----------------------
 # App Settings
