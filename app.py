@@ -101,10 +101,12 @@ if df.empty:
     st.warning("No player stats available yet (games may not have started).")
     st.stop()
 
-# Clean + sort
-for c in ["PTS", "FGA", "3PA", "TO"]:
+# Ensure expected columns exist (ESPN can vary slightly)
+for c in ["team", "matchup", "name", "MIN", "PTS", "FGM", "FGA", "3PM", "3PA", "FTM", "FTA", "REB", "AST", "STL", "BLK", "TO", "PF"]:
     if c not in df.columns:
         df[c] = 0
+
+# Default sort
 df = df.sort_values(["PTS", "FGA", "3PA", "TO"], ascending=[False, False, False, False]).reset_index(drop=True)
 
 
@@ -170,9 +172,9 @@ with tab_box:
                     status = "✅ Hit" if current >= target else f"⏳ {current}/{target}"
 
                 watch_rows.append({
-                    "Player": p,
                     "Team": row.get("team", ""),
                     "Matchup": row.get("matchup", ""),
+                    "Player": p,
                     "Stat": stat,
                     "Current": current,
                     "Target": target if target is not None else "",
@@ -184,14 +186,47 @@ with tab_box:
 
     with right:
         st.subheader("📋 All Live Players (Box Score)")
+
+        # --- Controls: search + sort
+        c1, c2, c3 = st.columns([2, 2, 2])
+        with c1:
+            search_player = st.text_input("Search player", placeholder="Type name…")
+
+        with c2:
+            sort_col = st.selectbox(
+                "Sort by",
+                options=["PTS", "FGA", "3PA", "REB", "AST", "STL", "BLK", "TO", "MIN", "FTA", "PF", "name", "team"],
+                index=0
+            )
+
+        with c3:
+            sort_dir = st.radio("Order", ["Descending", "Ascending"], horizontal=True)
+
+        view = df.copy()
+
+        # Filter by player name
+        if search_player:
+            view = view[view["name"].astype(str).str.contains(search_player, case=False, na=False)]
+
+        # Sort
+        ascending = (sort_dir == "Ascending")
+        if sort_col in view.columns:
+            view = view.sort_values(sort_col, ascending=ascending)
+
+        # Column order: Team + Matchup to the left of Player
         cols_box = [
-            "name", "team", "matchup", "MIN", "PTS",
-            "FGM", "FGA", "3PM", "3PA", "FTM", "FTA",
-            "REB", "AST", "STL", "BLK", "TO", "PF"
+            "team", "matchup", "name",
+            "MIN", "PTS",
+            "FGM", "FGA", "3PM", "3PA",
+            "FTM", "FTA",
+            "REB", "AST", "STL", "BLK",
+            "TO", "PF"
         ]
-        # Only show columns that exist (ESPN can vary slightly)
-        cols_box = [c for c in cols_box if c in df.columns]
-        st.dataframe(df[cols_box], use_container_width=True, hide_index=True)
+        cols_box = [c for c in cols_box if c in view.columns]
+
+        st.dataframe(view[cols_box], use_container_width=True, hide_index=True)
+
+        st.caption("Tip: you can also click any column header to sort.")
 
 with tab_adv:
     st.subheader("🧠 Advanced Stats")
@@ -203,11 +238,12 @@ with tab_adv:
     adv = add_advanced_columns(df)
 
     cols_adv = [
-        "name", "team", "matchup", "MIN",
+        "team", "matchup", "name", "MIN",
         "PRA", "PR", "PA", "RA", "STOCKS",
         "USG_PROXY", "PTS_PER_USG",
         "FG%", "3P%", "FT%",
         "PTS", "REB", "AST", "STL", "BLK", "TO", "FGA", "3PA", "FTA"
     ]
     cols_adv = [c for c in cols_adv if c in adv.columns]
+
     st.dataframe(adv[cols_adv], use_container_width=True, hide_index=True)
