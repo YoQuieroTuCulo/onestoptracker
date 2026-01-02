@@ -1,4 +1,8 @@
 def normalize_player_stats(players):
+    """
+    Normalizes NBA live boxscore player list into basic box-score columns.
+    Keep this file as the "raw box score" layer (no advanced calc here).
+    """
     rows = []
     for p in players:
         stats = p.get("statistics", {}) or {}
@@ -14,16 +18,14 @@ def normalize_player_stats(players):
             "name": p.get("name", ""),
             "team": p.get("teamTricode", ""),
 
-            # Core scoring
+            # Minutes / scoring
+            "MIN": stats.get("minutes", 0),
             "PTS": stats.get("points", 0),
 
             # Shooting
-            "FGM": fgm,
-            "FGA": fga,
-            "3PM": tpm,
-            "3PA": tpa,
-            "FTM": ftm,
-            "FTA": fta,
+            "FGM": fgm, "FGA": fga,
+            "3PM": tpm, "3PA": tpa,
+            "FTM": ftm, "FTA": fta,
 
             # Rebounds
             "OREB": stats.get("reboundsOffensive", 0),
@@ -38,8 +40,5 @@ def normalize_player_stats(players):
             # Mistakes / fouls
             "TO": stats.get("turnovers", 0),
             "PF": stats.get("foulsPersonal", 0),
-
-            # Minutes
-            "MIN": stats.get("minutes", 0),
         })
     return rows
