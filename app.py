@@ -71,29 +71,30 @@ if not games:
     st.warning("No live games found right now (or NBA feed temporarily unavailable).")
     st.stop()
 
-all_rows = []
+
+    all_rows = []
 skipped = 0
 
 for g in games:
     gid = g["gameId"]
+    date = g["date"]
 
-    home, away = get_boxscore(gid)
-    if home is None or away is None:
+    home, away = get_boxscore(gid, date)
+    if home is None:
         skipped += 1
         continue
 
-    players = home.get("players", []) + away.get("players", [])
+    players = home.get("players", [])  # players list is here
     rows = normalize_player_stats(players)
 
-    matchup = f'{away["teamTricode"]} @ {home["teamTricode"]}'
+    matchup = f'{g.get("awayTricode","")} @ {g.get("homeTricode","")}'
     for r in rows:
         r["matchup"] = matchup
         r["gameId"] = gid
         all_rows.append(r)
 
-if skipped > 0:
-    st.sidebar.info(f"Skipped {skipped} game(s) with unavailable boxscore (not started or temporarily blocked).")
-
+if skipped:
+    st.sidebar.info(f"Skipped {skipped} game(s) (boxscore not available yet).")
 
 df = pd.DataFrame(all_rows)
 if df.empty:
