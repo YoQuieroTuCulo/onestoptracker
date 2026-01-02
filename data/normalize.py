@@ -1,44 +1,44 @@
 def normalize_player_stats(players):
     """
-    Normalizes NBA live boxscore player list into basic box-score columns.
-    Keep this file as the "raw box score" layer (no advanced calc here).
+    data.nba.net activePlayers format.
     """
     rows = []
     for p in players:
-        stats = p.get("statistics", {}) or {}
+        # data.nba.net uses different keys than cdn.nba.com
+        name = f"{p.get('firstName','').strip()} {p.get('lastName','').strip()}".strip()
+        team = p.get("teamTriCode") or p.get("teamTricode") or ""
 
-        fgm = stats.get("fieldGoalsMade", 0)
-        fga = stats.get("fieldGoalsAttempted", 0)
-        tpm = stats.get("threePointersMade", 0)
-        tpa = stats.get("threePointersAttempted", 0)
-        ftm = stats.get("freeThrowsMade", 0)
-        fta = stats.get("freeThrowsAttempted", 0)
+        stats = p.get("statistics", {}) or p.get("stats", {}) or {}
+
+        # data.nba.net typically uses these keys:
+        fgm = int(stats.get("fgm", 0) or 0)
+        fga = int(stats.get("fga", 0) or 0)
+        tpm = int(stats.get("tpm", 0) or 0)
+        tpa = int(stats.get("tpa", 0) or 0)
+        ftm = int(stats.get("ftm", 0) or 0)
+        fta = int(stats.get("fta", 0) or 0)
 
         rows.append({
-            "name": p.get("name", ""),
-            "team": p.get("teamTricode", ""),
+            "name": name,
+            "team": team,
 
-            # Minutes / scoring
-            "MIN": stats.get("minutes", 0),
-            "PTS": stats.get("points", 0),
+            "MIN": stats.get("min", "0"),
+            "PTS": int(stats.get("points", 0) or 0),
 
-            # Shooting
             "FGM": fgm, "FGA": fga,
             "3PM": tpm, "3PA": tpa,
             "FTM": ftm, "FTA": fta,
 
-            # Rebounds
-            "OREB": stats.get("reboundsOffensive", 0),
-            "DREB": stats.get("reboundsDefensive", 0),
-            "REB": stats.get("reboundsTotal", 0),
+            "OREB": int(stats.get("offReb", 0) or 0),
+            "DREB": int(stats.get("defReb", 0) or 0),
+            "REB": int(stats.get("totReb", 0) or 0),
 
-            # Playmaking / defense
-            "AST": stats.get("assists", 0),
-            "STL": stats.get("steals", 0),
-            "BLK": stats.get("blocks", 0),
+            "AST": int(stats.get("assists", 0) or 0),
+            "STL": int(stats.get("steals", 0) or 0),
+            "BLK": int(stats.get("blocks", 0) or 0),
 
-            # Mistakes / fouls
-            "TO": stats.get("turnovers", 0),
-            "PF": stats.get("foulsPersonal", 0),
+            "TO": int(stats.get("turnovers", 0) or 0),
+            "PF": int(stats.get("pFouls", 0) or 0),
         })
+
     return rows
