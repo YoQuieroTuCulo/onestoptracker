@@ -89,7 +89,7 @@ if "watchlist" not in st.session_state:
     st.session_state["watchlist"] = []
 
 player_options = df["name"].dropna().unique().tolist()
-stat_options = stat_options = ["PTS","MIN",
+stat_options = ["PTS","MIN",
     "FGM","FGA","3PM","3PA","FTM","FTA",
     "REB","OREB","DREB",
     "AST","STL","BLK",
