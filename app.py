@@ -1,16 +1,15 @@
 import hmac
-import time
 import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
-from logic.advanced import add_advanced_columns
 
 from data.fetch_live import get_live_games, get_boxscore
 from data.normalize import normalize_player_stats
+from logic.advanced import add_advanced_columns
 
 
 # -----------------------
-# Beta Password Gate
+# Beta Password Gate (Option A)
 # -----------------------
 def check_password() -> bool:
     if st.session_state.get("password_ok", False):
@@ -30,18 +29,20 @@ def check_password() -> bool:
     return False
 
 
-if not check_password():
-    st.stop()
-
 def advanced_unlocked() -> bool:
     """
-    Beta feature flag for advanced tab.
-    Later: replace with Stripe subscription check.
+    Feature flag for Advanced tab.
+    Later: replace this with Stripe subscription check.
     """
     return str(st.secrets.get("ADVANCED_UNLOCKED", "false")).lower() == "true"
 
+
+if not check_password():
+    st.stop()
+
+
 # -----------------------
-# App Settings
+# App Shell
 # -----------------------
 st.set_page_config(page_title="Live Stat Line Tracker", layout="wide")
 
@@ -55,14 +56,15 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    st.subheader("Watchlist")
+    st.subheader("⭐ Watchlist")
+
 
 st.title("📊 Live Stat Line Tracker (NBA)")
-st.caption("Tracking: FGA, 3PTA, TO, PTS")
+st.caption("Box Score is free. Advanced tab is a separate (lockable) feature.")
 
 
 # -----------------------
-# Pull all games + build a single table
+# Pull games + build one big DF
 # -----------------------
 games = get_live_games()
 if not games:
@@ -83,29 +85,28 @@ for g in games:
         all_rows.append(r)
 
 df = pd.DataFrame(all_rows)
+if df.empty:
+    st.warning("No player stats available yet.")
+    st.stop()
 
-# Clean sort
-df = df.sort_values(["FGA", "3PTA", "TO"], ascending=[False, False, False]).reset_index(drop=True)
+# Clean + sort
+df = df.sort_values(["PTS", "FGA", "3PA", "TO"], ascending=[False, False, False, False]).reset_index(drop=True)
 
 
 # -----------------------
-# Watchlist UI
+# Watchlist (persisted)
 # -----------------------
-# Persist watchlist across refreshes
 if "watchlist" not in st.session_state:
     st.session_state["watchlist"] = []
 
 player_options = df["name"].dropna().unique().tolist()
-stat_options = ["PTS","MIN",
-    "FGM","FGA","3PM","3PA","FTM","FTA",
-    "REB","OREB","DREB",
-    "AST","STL","BLK",
-    "TO","PF"]
 
+# Box-score stats user can watch (safe for free tab)
+watch_stats = ["PTS","FGA","3PA","TO","AST","REB","STL","BLK","MIN","FTA","PF"]
 
 with st.sidebar:
     sel_player = st.selectbox("Player", options=player_options)
-    sel_stat = st.selectbox("Stat", options=stat_options)
+    sel_stat = st.selectbox("Stat", options=watch_stats)
     sel_target = st.number_input("Target (optional)", min_value=0.0, value=0.0, step=0.5)
 
     if st.button("Add to watchlist"):
@@ -120,45 +121,70 @@ with st.sidebar:
 
 
 # -----------------------
-# Layout: Watchlist + Full Table
+# Tabs
 # -----------------------
-left, right = st.columns([1, 2], gap="large")
+tab_box, tab_adv = st.tabs(["📋 Box Score", "🧠 Advanced (beta)"])
 
-with left:
-    st.subheader("⭐ Watchlist")
-    if not st.session_state["watchlist"]:
-        st.info("Add players + stats on the left sidebar.")
-    else:
-        watch_rows = []
-        for item in st.session_state["watchlist"]:
-            p = item["player"]
-            stat = item["stat"]
-            target = item["target"]
+with tab_box:
+    left, right = st.columns([1, 2], gap="large")
 
-            sub = df[df["name"] == p]
-            if sub.empty:
-                continue
-            row = sub.iloc[0].to_dict()
+    with left:
+        st.subheader("⭐ Watchlist")
+        if not st.session_state["watchlist"]:
+            st.info("Add players + stats from the sidebar.")
+        else:
+            watch_rows = []
+            for item in st.session_state["watchlist"]:
+                p = item["player"]
+                stat = item["stat"]
+                target = item["target"]
 
-            current = row.get(stat, 0)
-            status = ""
-            if target:
-                status = "✅ Hit" if current >= target else f"⏳ {current}/{target}"
+                sub = df[df["name"] == p]
+                if sub.empty:
+                    continue
+                row = sub.iloc[0].to_dict()
 
-            watch_rows.append({
-                "Player": p,
-                "Team": row.get("team", ""),
-                "Matchup": row.get("matchup", ""),
-                "Stat": stat,
-                "Current": current,
-                "Target": target if target else "",
-                "Status": status
-            })
+                current = row.get(stat, 0)
+                status = ""
+                if target is not None:
+                    status = "✅ Hit" if current >= target else f"⏳ {current}/{target}"
 
-        wdf = pd.DataFrame(watch_rows)
-        st.dataframe(wdf, use_container_width=True, hide_index=True)
+                watch_rows.append({
+                    "Player": p,
+                    "Team": row.get("team", ""),
+                    "Matchup": row.get("matchup", ""),
+                    "Stat": stat,
+                    "Current": current,
+                    "Target": target if target is not None else "",
+                    "Status": status,
+                })
 
-with right:
-    st.subheader("📋 All Live Players")
-    cols = ["name","team","matchup","MIN","PTS","FGM","FGA","3PM","3PA","FTM","FTA","REB","AST","STL","BLK","TO","PF"]
-st.dataframe(df[cols], use_container_width=True, hide_index=True)
+            wdf = pd.DataFrame(watch_rows)
+            st.dataframe(wdf, use_container_width=True, hide_index=True)
+
+    with right:
+        st.subheader("📋 All Live Players (Box Score)")
+        cols_box = [
+            "name","team","matchup","MIN","PTS",
+            "FGM","FGA","3PM","3PA","FTM","FTA",
+            "REB","AST","STL","BLK","TO","PF"
+        ]
+        st.dataframe(df[cols_box], use_container_width=True, hide_index=True)
+
+with tab_adv:
+    st.subheader("🧠 Advanced Stats")
+
+    if not advanced_unlocked():
+        st.info("Advanced stats are locked right now. (Later: paywall/subscription).")
+        st.stop()
+
+    adv = add_advanced_columns(df)
+
+    cols_adv = [
+        "name","team","matchup","MIN",
+        "PRA","PR","PA","RA","STOCKS",
+        "USG_PROXY","PTS_PER_USG",
+        "FG%","3P%","FT%",
+        "PTS","REB","AST","STL","BLK","TO","FGA","3PA","FTA"
+    ]
+    st.dataframe(adv[cols_adv], use_container_width=True, hide_index=True)
